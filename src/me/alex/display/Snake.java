@@ -8,17 +8,19 @@ import javafx.collections.ObservableList;
 import javafx.scene.Node;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
-import me.alex.display.Main.Direction;
+import me.alex.display.Backend.Direction;
 
 public class Snake {
 	
 	private List<Rectangle> snakelets;
 	private Rectangle head, tail;
 	private Main main;
+	private Backend be;
 	
 	public Snake(Rectangle start) {
 		this.head = start;
 		this.tail = start;
+		this.be = Backend.getInstance();
 		this.main = Main.getInstance();
 		snakelets = new ArrayList<Rectangle>();
 		snakelets.add(head);
@@ -28,7 +30,7 @@ public class Snake {
 		return this.snakelets;
 	}
 	
-	private boolean collisionCheck() {
+	private boolean collidesWithItself() {
 		for (int i = 1; i < snakelets.size(); i++) {
 			Rectangle check = snakelets.get(i);
 			if (head.getX() == check.getX() && head.getY() == check.getY()) {
@@ -38,10 +40,10 @@ public class Snake {
 		return false;
 	}
 	
-	private void incLength() {
+	private void incrementLength() {
 		Rectangle r = new Rectangle();
-		r.setHeight(main.getSnakeHeight());
-		r.setWidth(main.getSnakeWidth());
+		r.setHeight(be.getSnakeHeight());
+		r.setWidth(be.getSnakeWidth());
 		r.setFill(Color.BLUE);
 		snakelets.add(r);
 		tail = r;
@@ -57,24 +59,25 @@ public class Snake {
 		}
 		
 		if (head.getX() < 0) {
-			head.setX(main.getParent().getWidth());
+			head.setX(main.getParent().getWidth() - 10);
 		} else if (head.getX() > main.getParent().getWidth()) {
-			head.setX(0);
+			head.setX(1);
 		} if (head.getY() < 0) {
-			head.setY(main.getParent().getHeight());
+			head.setY(main.getParent().getHeight() - 10);
 		} else if (head.getY() > main.getParent().getHeight()) {
-			head.setY(0);
+			head.setY(1);
 		}
 	}
 	
 	private void gameOverHandling() {
-		if (collisionCheck()) {
-			main.updateScore(true);
+		if (collidesWithItself()) {
+			be.updateScore(true);
 			Platform.runLater(() -> {
 				for (int i = snakelets.size()-1; i > 0; i--) {
 					ObservableList<Node> nodes = main.getParent().getChildren();
 					Rectangle r = snakelets.remove(i);
 					nodes.remove(r);
+					tail = head;
 				}
 			});	
 			System.out.println("Game over!");
@@ -82,22 +85,25 @@ public class Snake {
 	}
 	
 	private void eatFoodHandling() {
-		if (head.intersects(main.getFood().getBoundsInLocal())) {
-			main.updateScore(false);
-			incLength();
+		if (head.intersects(be.getFood().getBoundsInLocal())) {
+			be.updateScore(false);
+			incrementLength();
+			Rectangle r = be.getFood();
 			Platform.runLater(() -> {
-				main.getParent().getChildren().remove(main.getFood());
-				main.generateRectangles();
+				main.getParent().getChildren().remove(be.getFood());
+				be.spawnFood();
 			});
-			while (main.getParent().getChildren().contains(main.getFood())) {}
+			while (main.getParent().getChildren().contains(r)) {}
 		}
 	}
 	
 	public void moveSnake(Direction dir, int increase) {
-		double lastX = head.getX(), lastY = head.getY();
+		double lastX = head.getX();
+		double lastY = head.getY();
 		relocateHead(dir, increase);
 		Thread th = new Thread(() -> {
-		gameOverHandling(); });
+			gameOverHandling(); 
+		});
 		th.start();
 		try {
 			th.join();
@@ -105,8 +111,9 @@ public class Snake {
 			e.printStackTrace();
 		}
 		eatFoodHandling();
-		if (snakelets.size() != 1 && !main.getParent().getChildren().contains(tail)) {
+		if (!main.getParent().getChildren().contains(tail)) {
 			Platform.runLater(() -> {
+				
 				main.getParent().getChildren().add(tail);
 			});
 		}
